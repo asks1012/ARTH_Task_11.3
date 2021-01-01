@@ -1,0 +1,65 @@
+- hosts: web
+  vars_prompt:
+  - name: mount_path
+    prompt: Enter the directory to mount dvd
+    private: no
+  - name: document_root
+    prompt: Enter the directory for document root of httpd
+    private: no
+  tasks:
+  - name: Creating directory for mouting dvd
+    file:
+      path: "{{ mount_path }}"
+      state: directory
+  - name: Mounting dvd
+    mount:
+      src: /dev/cdrom
+      path: "{{ mount_path }}"
+      state: mounted
+      fstype: iso9660
+  - name: Configuring yum repository-1
+    yum_repository:
+      baseurl: "{{ mount_path  }}/AppStream"
+      name: dvd1
+      file: dvd
+      gpgcheck: no
+      description: appstream_repo
+  - name: Configuring yum repository-2
+    yum_repository:
+      baseurl: "{{ mount_path  }}/BaseOS"
+      name: dvd2
+      file: dvd
+      gpgcheck: no
+      description: baseos_repo
+  - name: Installing httpd software
+    package:
+      name: "httpd"
+      state: present
+  - name: Creating document root directory
+    file:
+      path: "{{ document_root  }}"
+      state: directory
+  - name: Copying html file
+    copy:
+      dest: "{{ document_root  }}/httpd.html"
+      content: This is web server configured through idempotent ansible playbook
+  - name: Enabling port 8080 in firewalld
+    firewalld:
+      port: 8080/tcp
+      state: enabled
+      permanent: yes
+      immediate: yes
+  - name: Copying httpd configuration file
+    template:
+      dest: /etc/httpd/conf.d/server.conf
+      src: /root/file.conf
+    notify: restart httpd
+  - name: Starting httpd server
+    service:
+      name: httpd
+      state: started
+  handlers:
+  - name: restart httpd
+    service:
+      name: httpd
+      state: restarted
